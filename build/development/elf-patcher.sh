@@ -40,6 +40,7 @@ fi
 # Find all Theia ELF files that are dynamically linked.
 # - This should includes all Theia .node files and spawn-helper, but not statically-linked binaries like 'rg'
 # - The only way to tell if a file is an ELF binary (or library) is to check the first 4 bytes for the magic byte sequence.
+cp -a ./ $THEIA_PATH/theia
 find $THEIA_PATH/theia/node_modules -type f ! -name '*.o' -exec hexdump -n 4 -e '4/1 "%2x" " {}\n"' {} \; | sed '/^7f454c46/!d; s/^7f454c46 //' | xargs -n 1 -P 4 file | grep dynamically >/tmp/theia-elf-file
 
 # Separate out those that do and do not require an interpreter (binaries and libs, respectively) into separate lists.

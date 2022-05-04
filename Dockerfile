@@ -2,16 +2,15 @@ ARG NODE_VERSION=12
 
 FROM node:${NODE_VERSION}-alpine as theia-build
 
+ARG THEIA_VERSION
+
 RUN apk update && \
     apk add --no-cache make gcc g++ python3 libsecret-dev s6 curl file && \
     apk add --no-cache patchelf --repository=http://dl-cdn.alpinelinux.org/alpine/edge/community
 
-ARG OPT_PATH
-ARG THEIA_VERSION
-ARG THEIA_PATH=$OPT_PATH/ide/theia/theia-$THEIA_VERSION
-
-WORKDIR $THEIA_PATH/theia
-ADD ./ide/theia/$THEIA_VERSION/build/ ./
+USER node
+WORKDIR /home/node
+ADD --chown=node:node ./ide/theia/$THEIA_VERSION/build/ ./
 
 # Build Theia
 RUN PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=1 && NODE_OPTIONS="--max_old_space_size=4096" && yarn
@@ -34,11 +33,12 @@ RUN yarn autoclean --init && \
     rm -rf patches && \
     rm -rf node_modules/puppeteer/.local-chromium
 
-
 # Patch all binaries and dynamic libraries for full portability.
 COPY build/development/elf-patcher.sh $THEIA_PATH/bin/elf-patcher.sh
 
 ARG BINARIES="node busybox s6-svscan curl"
+
+USER root
 RUN $THEIA_PATH/bin/elf-patcher.sh && \
     cd $THEIA_PATH/bin && \
     ln -sf busybox sh && \
@@ -247,7 +247,7 @@ COPY --from=vsix-plugins --chown=$USER:$USER /root/theia-plugins $HOME/theia-plu
 ################################################################################
 # THEIA INTEGRATION
 #
-COPY --from=theia $THEIA_PATH $THEIA_PATH/
+COPY --from=theia --chown=root:root $THEIA_PATH $THEIA_PATH
 
 ################################################################################
 # Cause the creation of a volume at /opt/dockside.
