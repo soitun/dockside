@@ -158,8 +158,7 @@ RUN apt-get update && \
     acl \
     s6 \
     jq \
-    logrotate cron- bcron- exim4- \
-    libatomic1
+    logrotate cron- bcron- exim4-
 
 ################################################################################
 # DEVELOPMENT DEPENDENCIES
