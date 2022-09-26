@@ -5,10 +5,6 @@
 # Environment variable inputs:
 # - BINARIES - list of additional system binaries 
 # - THEIA_PATH - path to Theia version to be scanned and patched
-# - LD_MUSL_BIN
-
-# LD_MUSL_BIN=ld-musl-x86_64.so.1
-LD_MUSL_BIN=$(basename /lib/ld-musl-*)
 
 # Determine LD_MUSL filename, which is architecture-dependent
 # e.g. ld-musl-aarch64.so.1 (linux/arm64), ld-musl-armhf.so.1 (linux/arm/v7), ld-musl-x86_64.so.1 (linux/amd64)
@@ -45,14 +41,18 @@ if [ "$1" = "--checkelfs" ]; then
   exit $?
 fi
 
-# Find all Theia ELF files that are dynamically linked.
-# - This should includes all Theia .node files and spawn-helper, but not statically-linked binaries like 'rg'
-# - The only way to tell if a file is an ELF binary (or library) is to check the first 4 bytes for the magic byte sequence.
-find $THEIA_PATH/theia/node_modules -type f ! -name '*.o' -exec hexdump -n 4 -e '4/1 "%2x" " {}\n"' {} \; | sed '/^7f454c46/!d; s/^7f454c46 //' | xargs -n 1 -P 4 file | grep dynamically >/tmp/theia-elf-file
+if [ "$1" = "--findelfs" ]; then
+
+  # Find all Theia ELF files that are dynamically linked.
+  # - This should includes all Theia .node files and spawn-helper, but not statically-linked binaries like 'rg'
+  # - The only way to tell if a file is an ELF binary (or library) is to check the first 4 bytes for the magic byte sequence.
+  find $THEIA_PATH/theia/node_modules -type f ! -name '*.o' -exec hexdump -n 4 -e '4/1 "%2x" " {}\n"' {} \; | sed '/^7f454c46/!d; s/^7f454c46 //' | xargs -n 1 -P 4 file | grep dynamically >$THEIA_PATH/.theia-elf-file
+  exit $?
+fi
 
 # Separate out those that do and do not require an interpreter (binaries and libs, respectively) into separate lists.
-grep interpreter /tmp/theia-elf-file | cut -d':' -f1 >/tmp/theia-elf-bin
-grep -v interpreter /tmp/theia-elf-file | cut -d':' -f1 >/tmp/theia-elf-lib
+grep interpreter $THEIA_PATH/.theia-elf-file | cut -d':' -f1 >/tmp/theia-elf-bin
+grep -v interpreter $THEIA_PATH/.theia-elf-file | cut -d':' -f1 >/tmp/theia-elf-lib
 
 # Copy any non-Theia binaries we require to the install location, and generate an additional list.
 mkdir -p $THEIA_PATH/bin

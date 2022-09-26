@@ -41,7 +41,15 @@ RUN yarn autoclean --init && \
 # Patch all binaries and dynamic libraries for full portability.
 COPY build/development/elf-patcher.sh $THEIA_PATH/bin/elf-patcher.sh
 
-FROM theia-clean as theia
+FROM theia-clean as theia-elfs
+
+ARG OPT_PATH
+ARG THEIA_VERSION
+ARG THEIA_PATH=$OPT_PATH/ide/theia/theia-$THEIA_VERSION
+
+RUN $THEIA_PATH/bin/elf-patcher.sh --findelfs
+
+FROM theia-elfs as theia
 
 ARG OPT_PATH
 ARG THEIA_VERSION
