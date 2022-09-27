@@ -8,7 +8,10 @@
 
 # Determine LD_MUSL filename, which is architecture-dependent
 # e.g. ld-musl-aarch64.so.1 (linux/arm64), ld-musl-armhf.so.1 (linux/arm/v7), ld-musl-x86_64.so.1 (linux/amd64)
-LD_MUSL_BIN=$(basename /lib/ld-musl-*)
+
+# FIXME: Rename LD_MUSL_BIN and find name of ld-2.28.so rationally
+# LD_MUSL_BIN=$(basename /lib/ld-musl-*)
+LD_MUSL_BIN=ld-2.28.so
 
 append() {
   while read line; do echo "${line}${1}"; done
@@ -85,16 +88,24 @@ do
   [ "$(basename $dest)" != "$lib" ] && cd $THEIA_PATH/lib64/$(dirname $dest) && ln -s $(basename $dest) $lib && cd -
 done
 
+# FIXME: Find path of $LD_MUSL_BIN rationally
+cp -a /lib/x86_64-linux-gnu/$LD_MUSL_BIN $THEIA_PATH/lib64/lib
+
 # For all ELF binaries, set the interpreter to our own.
 for bin in $(sort -u /tmp/cmd-elf-bin /tmp/theia-elf-bin)
 do
-  patchelf --set-interpreter $THEIA_PATH/lib64/lib/$LD_MUSL_BIN $bin
+  # Needs bash
+  if ! [[ "$(ldd $bin)" =~ statically ]]; then
+    patchelf --set-interpreter $THEIA_PATH/lib64/lib/$LD_MUSL_BIN $bin
+  fi
 done
 
 # For all ELF libs, set the RPATH to our own, and force RPATH use.
 for lib in $(sort -u /tmp/cmd-elf-bin /tmp/theia-elf-bin /tmp/theia-elf-lib)
 do
-  patchelf --force-rpath --set-rpath $THEIA_PATH/lib64/lib:$THEIA_PATH/lib64/usr/lib $lib
+  if ! [[ "$(ldd $lib)" =~ statically ]]; then
+    patchelf --force-rpath --set-rpath $THEIA_PATH/lib64/lib/x86_64-linux-gnu:$THEIA_PATH/lib64/usr/lib/x86_64-linux-gnu $lib
+  fi
 done
 
 # Prepare full and unique list of ELF binaries and libs for reference purposes and for checking

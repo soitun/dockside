@@ -1,10 +1,11 @@
 ARG NODE_VERSION=12
 ARG ALPINE_VERSION=3.14
 
-FROM node:${NODE_VERSION}-alpine${ALPINE_VERSION} as theia-build
+FROM node:${NODE_VERSION}-buster as theia-build
 
-RUN apk update && \
-    apk add --no-cache make gcc g++ python3 libsecret-dev s6 curl file patchelf
+RUN apt update && \
+    apt install -y make gcc g++ python3 libsecret-1-dev s6 curl file patchelf && \
+    apt install -y bsdextrautils || apt install -y bsdmainutils
 
 ARG OPT_PATH
 ARG THEIA_VERSION
@@ -41,15 +42,24 @@ RUN yarn autoclean --init && \
 # Patch all binaries and dynamic libraries for full portability.
 COPY build/development/elf-patcher.sh $THEIA_PATH/bin/elf-patcher.sh
 
-FROM theia-clean as theia
+FROM theia-clean as theia-elfs
 
 ARG OPT_PATH
 ARG THEIA_VERSION
-ARG THEIA_PATH=$OPT_PATH/ide/theia/theia-$THEIA_VERSION
+ENV THEIA_PATH=$OPT_PATH/ide/theia/theia-$THEIA_VERSION
+ENV BINARIES="node busybox s6-svscan curl"
 
-ARG BINARIES="node busybox s6-svscan curl"
+RUN apt install -y busybox && $THEIA_PATH/bin/elf-patcher.sh --findelfs
 
-RUN $THEIA_PATH/bin/elf-patcher.sh && \
+FROM theia-elfs as theia
+
+ARG OPT_PATH
+ARG THEIA_VERSION
+ENV THEIA_PATH=$OPT_PATH/ide/theia/theia-$THEIA_VERSION
+ENV BINARIES="node busybox s6-svscan curl"
+
+# FIXME: Debian busybox doesn't support su or pgrep
+RUN bash $THEIA_PATH/bin/elf-patcher.sh && \
     cd $THEIA_PATH/bin && \
     ln -sf busybox sh && \
     ln -sf busybox su && \
