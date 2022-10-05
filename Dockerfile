@@ -42,24 +42,18 @@ RUN yarn autoclean --init && \
 # Patch all binaries and dynamic libraries for full portability.
 COPY build/development/elf-patcher.sh $THEIA_PATH/bin/elf-patcher.sh
 
-FROM theia-clean as theia-elfs
+FROM theia-clean as theia-findelfs
 
 ARG OPT_PATH
 ARG THEIA_VERSION
 ENV THEIA_PATH=$OPT_PATH/ide/theia/theia-$THEIA_VERSION
 ENV BINARIES="node busybox s6-svscan curl"
 
-RUN apt install -y busybox && $THEIA_PATH/bin/elf-patcher.sh --findelfs
+RUN $THEIA_PATH/bin/elf-patcher.sh --findelfs
 
-FROM theia-elfs as theia
+FROM theia-findelfs as theia
 
-ARG OPT_PATH
-ARG THEIA_VERSION
-ENV THEIA_PATH=$OPT_PATH/ide/theia/theia-$THEIA_VERSION
-ENV BINARIES="node busybox s6-svscan curl"
-
-# FIXME: Debian busybox doesn't support su or pgrep
-RUN bash $THEIA_PATH/bin/elf-patcher.sh && \
+RUN $THEIA_PATH/bin/elf-patcher.sh --patchelfs && \
     cd $THEIA_PATH/bin && \
     ln -sf busybox sh && \
     ln -sf busybox su && \
