@@ -17,6 +17,12 @@
          "auth": [ "*" ],
          "images": [ "*" ],
          "runtimes": [ "*" ]
+      },
+      "secrets": {
+         "ssh": {
+            "authorized_keys": [],
+            "keypairs": {}
+         }
       }
    },
    // Example
@@ -37,6 +43,12 @@
    //       "profiles": { "admin-only-profile": 0 },
    //       "networks": { "*": 1, "custom-network-we-want-disabled": 0 },
    //       "runtimes": { "sysbox-runc": 0, "gvisor": 1 }
+   //    },
+   //    "secrets": {
+   //       "ssh": {
+   //         "authorized_keys": [],
+   //          "keypairs": {}
+   //       }
    //    }
    // }
 }

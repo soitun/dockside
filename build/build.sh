@@ -4,12 +4,11 @@ IMAGE=$(basename $(pwd))
 REPO="newsnowlabs/dockside"
 DOCKERFILE="Dockerfile"
 TAG_DATE="$(date -u +%Y%m%d%H%M%S)"
-THEIA_VERSION=1.35.0
 BUILDER=buildkit
 PLATFORMS_DEFAULT_DEPOT="linux/amd64,linux/arm64,linux/arm/v7"
 
 usage() {
-  echo "$0: [[--stage <stage>] [--tag <tag>] [--theia <version>]] [--push|--load] [--no-cache] [--force-rm] [--progress-plain] [--repo <repo>] [--builder [depot|buildx|buildkit]] [--platform=<platforms>] | [--clean] | [--list]" >&2
+  echo "$0: [[--stage <stage>] [--tag <tag>] [--theia <version>]] [--push|--load] [--no-cache] [--force-rm] [--progress-plain] [--repo <repo>] [--builder [depot|buildx|buildkit]] [--platforms <platforms>] | [--clean] | [--list]" >&2
   exit
 }
 
@@ -83,7 +82,6 @@ build_env() {
   DOCKER_OPTS=()
   DOCKER_OPTS+=("--label=com.newsnow.dockside.build.date=$TAG_DATE")
   DOCKER_OPTS+=("--build-arg=OPT_PATH=/opt/dockside")
-  DOCKER_OPTS+=("--build-arg=THEIA_VERSION=$THEIA_VERSION")
 
   [ -n "$NO_CACHE" ] && DOCKER_OPTS+=("--no-cache")
   [ -n "$FORCE_RM" ] && DOCKER_OPTS+=("--force-rm")

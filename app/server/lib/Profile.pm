@@ -49,7 +49,7 @@ sub versionUpgrade {
             if($routers->[$i]{'auth'}) {
                if(ref($routers->[$i]{'auth'}) ne 'ARRAY') {
                   # Set permissible array of auth modes to just the predefined default.
-                  $routers->[$i]{'auth'} = ($routers->[$i]{'type'} ne 'ide') ? [ 'user', 'developer', 'public', 'viewer', 'owner' ] : [ 'owner', 'developer' ];
+                  $routers->[$i]{'auth'} = ($routers->[$i]{'type'} =~ /^(ide|ssh)$/) ? [ 'owner', 'developer' ] : [ 'user', 'developer', 'public', 'viewer', 'owner' ];
                }
                # else allow current setting.
             }
@@ -134,19 +134,39 @@ sub new {
 
    $self->validate();
 
-   push(@{$self->{'routers'}}, {
-      "name" => 'ide',
-      "type" => 'ide',
-      "auth" => ['developer', 'owner'],
-      "prefixes" => ["ide"],
-      "domains" => ["*"],
-      "https" => {
-         "protocol" => "http", 
-         # FIXME: Change to port => $self->spare_port(), once this can be passed to
-         # the container IDE launch script.
-         "port" => 3131
-      },
-   });
+   # Add the IDE router, if none specified
+   if( ! grep { $_->{'type'} eq 'ide' } @{$self->{'routers'}} ) {
+      push(@{$self->{'routers'}}, {
+         "name" => 'ide',
+         "type" => 'ide',
+         "auth" => ['developer', 'owner'],
+         "prefixes" => ["ide"],
+         "domains" => ["*"],
+         "https" => {
+            "protocol" => "http", 
+            # FIXME: Change to port => $self->spare_port(), once this can be passed to
+            # the container IDE launch script.
+            "port" => 3131
+         },
+      });
+   }
+
+   # Add the SSH router, if none specified.
+   # N.B. Updating config.json .ssh property WON'T cause this to re-evaluate,
+   # not without reloading all profiles.
+   if( $self->has_ssh_enabled && ! grep { $_->{'type'} eq 'ssh' } @{$self->{'routers'}} ) {
+      push(@{$self->{'routers'}}, {
+         "name" => 'ssh',
+         "type" => 'ssh',
+         "auth" => ['developer', 'owner'],
+         "prefixes" => ["ssh"],
+         "domains" => ["*"],
+         "https" => {
+            "protocol" => "http", 
+            "port" => 2222
+         },
+      });
+   }
 
    return $self;
 }
@@ -163,7 +183,7 @@ sub validate {
    return undef unless $self->{'active'};
 
    # A list of allowed properties: a trailing '!' indicates the property is mandatory.
-   $self->do_validate( '', $self, qw( name! version! description active! mountIDE routers runtimes networks! images! unixusers imagePathsFilter mounts runDockerInit dockerArgs command entrypoint metadata lxcfs security ) );
+   $self->do_validate( '', $self, qw( name! version! description active! mountIDE routers runtimes networks! images! unixusers imagePathsFilter mounts runDockerInit dockerArgs command entrypoint metadata lxcfs ssh security ) );
 
    return $self;
 }
@@ -437,7 +457,7 @@ sub ports_hash {
    my %ports;
 
    # Compile a unique list of private exposed ports for the profile.
-   foreach my $router (@{ $_[0]->{'routers'} } ) {
+   foreach my $router (@{ $_[0]->routers } ) {
       foreach my $protocol (qw( http https )) {
          $ports{ $router->{$protocol}{'port'} }++ if exists $router->{$protocol}{'port'};
       }
@@ -522,12 +542,55 @@ sub should_mount_ide {
    return 0;
 }
 
+sub should_mount_host_data {
+   my $self = shift;
+
+   return 1 unless exists($self->{'mountHostData'}) && $self->{'mountHostData'} == 0;
+
+   return 0;
+}
+
 sub run_docker_init {
    my $self = shift;
 
-   flog("run_docker_init=''" . $self->{'runDockerInit'} . "'");
-
    return (exists($self->{'runDockerInit'}) && $self->{'runDockerInit'} == 0) ? 0 : 1;
+}
+
+sub has_lxcfs_enabled {
+   my $self = shift;
+
+   # Disabled unless lxcfs.mountpoints[] specified in config.json.
+   return 0 unless $CONFIG->{'lxcfs'} && ref($CONFIG->{'lxcfs'}{'mountpoints'}) eq 'ARRAY'
+      && $CONFIG->{'lxcfs'}{'available'} == 1;
+
+   # If lxcfs.default === true in config.json, disable if profile lxcfs === false
+   if( $CONFIG->{'lxcfs'}{'default'} == 1 ) {
+      return 0 if exists($self->{'lxcfs'}) && $self->{'lxcfs'} == 0;
+   }
+   # If lxcfs.default === false in config.json, disable unless profile lxcfs === true
+   elsif( $CONFIG->{'lxcfs'}{'default'} == 0 ) {
+      return 0 unless exists($self->{'lxcfs'}) && $self->{'lxcfs'} == 1;
+   }
+
+   return 1;
+}
+
+sub has_ssh_enabled {
+   my $self = shift;
+
+   # Disabled unless ssh props specified in config.json.
+   return 0 unless $CONFIG->{'ssh'};
+
+   # If ssh.default === true in config.json, disable if profile ssh === false
+   if( $CONFIG->{'ssh'}{'default'} == 1 ) {
+      return 0 if exists($self->{'ssh'}) && $self->{'ssh'} == 0;
+   }
+   # If ssh.default === false in config.json, disable unless profile ssh === true
+   elsif( $CONFIG->{'ssh'}{'default'} == 0 ) {
+      return 0 unless exists($self->{'ssh'}) && $self->{'ssh'} == 1;
+   }
+
+   return 1;
 }
 
 ################################################################################
@@ -563,7 +626,7 @@ sub applyConstraints {
       if($resourceType eq 'auth') {
 
          my $routers;
-         foreach my $router (@{$self->{'routers'}}) {
+         foreach my $router (@{$self->routers}) {
             $router->{'auth'} = [
                grep { $resourceConstraints->{$_} // $resourceConstraints->{'*'} } @{$router->{'auth'}}
             ];

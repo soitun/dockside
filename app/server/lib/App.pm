@@ -241,9 +241,18 @@ sub _handler {
 
    # Generate the 'parent fully qualified domain name', i.e.
    # a hostname from which child container hostnames can be generated,
-   # and on which cookies can be assigned,
+   # (and from which a cookie domain can ultimately be derived)
    # by stripping off leading characters up to the first '-' or '.'
+   #
+   # Host header may be of the form:
+   # - www.mydockside.co.uk -> .mydockside.co.uk
+   # - www-mydevtainer.mydockside.co.uk -> --mydevtainer.mydockside.co.uk
+   # - www-mydevtainer--mydocksidedevtainer.mydockside.co.uk -> --mydevtainer--mydocksidedevtainer.mydockside.co.uk
+   #
+   # When Dockside is accessed on a non-standard port, the Host header may also have :<port> suffixed.
+
    my $parentFQDN = $r->header_in('Host'); $parentFQDN =~ s!^[^\-\.]+!!;
+   $parentFQDN = '-' . $parentFQDN unless $parentFQDN =~ /^\./;
 
    # Determine level of authorisation of requestor.
    my $User = Request->authenticate( { 'cookie' => $r->header_in("Cookie"), 'protocol' => $protocol } );
@@ -439,6 +448,25 @@ sub _handler {
 
          my $containers = $User->reservations({'client' => 1});
          return json($r, 200, { 'status' => '200', 'data' => $containers });
+      }
+
+      ######################################
+      # Load Reservations and container data
+      #
+      if( $route =~ m!^/getAuthCookies/?$! ) {
+
+         my @cookies = $User->generate_auth_cookies($parentFQDN);
+         my ($cookie) = map { s/;.*$//; $_ } grep { /Secure;$/ } @cookies;
+
+         # Append on the globalCookie (if configured in config.json)
+         if( $CONFIG->{'globalCookie'} && $CONFIG->{'globalCookie'}{'name'} && $CONFIG->{'globalCookie'}{'secret'} ) {
+            $cookie .= sprintf("; %s=%s",
+               $CONFIG->{'globalCookie'}{'name'},
+               uri_escape($CONFIG->{'globalCookie'}{'secret'})
+            );
+         }
+
+         return json($r, 200, { 'status' => '200', 'data' => $cookie });
       }
 
       # Default: redirect to /

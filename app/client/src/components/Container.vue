@@ -20,7 +20,7 @@
                </h3>
                <h3 v-else>
                   <span><input type="text" v-bind:class="validName ? [] : ['red']" class="form-control" required v-model="form.name" placeholder="Devtainer name" :disabled="!hasProfiles"></span>
-                  <span class="error-info" v-if="!validName">Name must be lower case, consist only of letters and digits, and begin with a letter</span>
+                  <span class="error-info" v-if="!validName">Name must be lower case, consist only of letters, digits and hyphens (but not successive hyphens) and begin with a letter</span>
                </h3>
             </b-card-header>
 
@@ -88,7 +88,8 @@
                            <th>&#8674;&nbsp;{{ router.name }} </th>
                            <td v-if="!isEditMode && !isPrelaunchMode">
                               <b-button v-if="router.type != 'passthru' && container.status == 1" size="sm" variant="primary" v-bind:href="makeUri(router)" :target="makeUriTarget(router)">Open</b-button>
-                              <b-button v-if="router.type != 'passthru' && container.status >= 0" size="sm" variant="outline-secondary" v-on:click="copy(makeUri(router))">Copy</b-button>
+                              <b-button v-if="router.type != 'passthru' && container.status >= 0" size="sm" variant="outline-secondary" v-on:click="copyUri(router)">Copy</b-button>
+                              <b-button v-if="router.type === 'ssh' && container.status >= 0" size="sm" variant="outline-secondary" type="button" v-b-modal="'sshinfo-modal'" v-b-tooltip title="Configure SSH for Dockside">Setup</b-button>
                               ({{ container.meta.access[router.name] }} access)
                            </td>
                            <td v-else>
@@ -285,7 +286,7 @@
             return `${window.location.protocol}//${window.location.host}/container/${this.container.name}`;
          },
          validName() {
-            return this.form.name.match('^([a-z][a-z0-9]*|)$');
+            return this.form.name.match('^(?:[a-z](?:-[a-z0-9]+|[a-z0-9]+)+|)$');
          }
       },
       methods: {
@@ -319,7 +320,15 @@
             copyToClipboard(value);
          },
          makeUri(router) {
-            return [router.https ? 'https' : 'http', '://', (router.prefixes[0] ? router.prefixes[0] : 'www'), '-', this.container.name, window.dockside.host].join('');
+            return router.type !== 'ssh' ? 
+              [router.https ? 'https' : 'http', '://', (router.prefixes[0] ? router.prefixes[0] : 'www'), '-', this.container.name, window.dockside.host].join('') :
+              ['ssh://',this.container.data.unixuser,'@', (router.prefixes[0] ? router.prefixes[0] : 'www'), '-', this.container.name, window.dockside.host.split(':')[0]].join('');
+         },
+         copyUri(router) {
+            return router.type !== 'ssh' ? copyToClipboard(this.makeUri(router)) :
+               copyToClipboard(
+                 ['ssh ', this.container.data.unixuser,'@', (router.prefixes[0] ? router.prefixes[0] : 'www'), '-', this.container.name, window.dockside.host.split(':')[0]].join('')
+               );
          },
          makeUriTarget(router) {
             return [(router.prefixes[0] ? router.prefixes[0] : 'www'), '-', this.container.name, window.dockside.host].join('');
