@@ -184,7 +184,7 @@ sub run_pty {
    my $cmd     = shift;
    my $logfile = shift;
 
-   open( my $fh, ">", $logfile ) || die Exception->new( 'dbg' => "Cannot open logfile '$logfile': $!", 'msg' => 'Cannot create container launch log file' );
+   open( my $fh, ">>", $logfile ) || die Exception->new( 'dbg' => "Cannot open logfile '$logfile': $!", 'msg' => 'Cannot create container launch log file' );
    $fh->autoflush(1);
    my $ContainerID;
    my @input;

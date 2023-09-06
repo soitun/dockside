@@ -6,6 +6,8 @@ use JSON;
 use Expect;
 use Try::Tiny;
 use Tie::File;
+use IPC::Open2;
+use IPC::Open3;
 use Reservation::Mutate qw(update load_clean_map);
 use Reservation::Load;
 use Reservation::Launch;
@@ -968,11 +970,112 @@ sub launch {
 
    try {
 
-      flog("Reservation::launch: RUNNING: $cmd");
-
       # Set PATH required for 'docker run' to launch external credential helpers, like gcloud.
       local $ENV{'PATH'} = $CONFIG->{'docker'}{'PATH'};
       local $ENV{'HOME'} = $CONFIG->{'docker'}{'HOME'} // '/home/newsnow';
+      local $ENV{'DOCKER_BUILDKIT'} = 1;
+
+      if(1) {
+
+         my $imageIdFile = "$CONFIG->{'tmpPath'}/r-$id-iid.log";
+
+         open(my $LOGS, ">", "$CONFIG->{'tmpPath'}/r-$id.log"); # FIXME: || die
+         $LOGS->autoflush(1);
+
+         my @buildcmd = (
+            $CONFIG->{'docker'}{'bin'},
+            'build',
+            '--iidfile', $imageIdFile,
+            # '--force-rm',
+            # '--rm',
+            '-'
+         );
+
+         my $image;
+         if( my $PID = open3( my $OUT, undef, sprintf(">&%d", $LOGS->fileno()), @buildcmd ) ) {
+            # Magically prevent nginx from reaping the subprocess running $cmd, before we do.
+            # See https://www.perlmonks.org/?node_id=1032725
+            # https://stackoverflow.com/questions/5606668/no-child-processes-error-in-perl
+            local $SIG{'CHLD'} = 'DEFAULT';
+
+            # print $OUT "FROM docker:dind\n";
+            # print $OUT "RUN apk update && apk add sudo\n";
+            print $OUT <<'_EOE_'
+FROM ubuntu:focal
+
+ENV DEBIAN_FRONTEND="noninteractive"
+RUN apt-get update && apt-get install -y curl gnupg2 git \
+        python python3 python3-distutils python3-pip \
+        build-essential crossbuild-essential-arm64 qemu-user-static \
+        openjdk-11-jdk-headless zip unzip \
+        apt-transport-https ca-certificates gnupg-agent \
+        software-properties-common \
+        pkg-config libffi-dev patch diffutils libssl-dev iptables
+
+# Install Docker client for the website build.
+RUN curl -fsSL https://download.docker.com/linux/ubuntu/gpg | apt-key add -
+RUN add-apt-repository \
+   "deb https://download.docker.com/linux/ubuntu \
+   $(lsb_release -cs) \
+   stable"
+RUN apt-get -y install docker-ce-cli
+
+# Install gcloud.
+RUN curl https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-289.0.0-linux-x86_64.tar.gz | \
+    tar zxf - google-cloud-sdk && \
+    google-cloud-sdk/install.sh --quiet && \
+    ln -s /google-cloud-sdk/bin/gcloud /usr/bin/gcloud
+
+# Download the official bazel binary. The APT repository isn't used because there is not packages for arm64.
+RUN sh -c 'curl -o /usr/local/bin/bazel https://releases.bazel.build/4.0.0/release/bazel-4.0.0-linux-$(uname -m | sed s/aarch64/arm64/) && chmod ugo+x /usr/local/bin/bazel'
+WORKDIR /workspace
+ENTRYPOINT ["/usr/local/bin/bazel"]
+_EOE_
+;
+            close $OUT;
+
+            waitpid(-1, 0);
+            my $code = ($? >> 8) & 255;
+            
+            open(my $IN, "<", $imageIdFile) || die Exception->new( 'msg' => "Unable to read image iid file" );
+            # Slurp all input
+            local $/;
+            $image = <$IN>;
+            close $IN;
+
+            # Chomp all trailing whitespace
+            local $/ = '';
+            chomp $image;
+
+            flog("Reservation::launch: image build returned code $code, image '$image'");
+
+            die Exception->new( 'msg' => "Unable to build image (code $code)" ) if $code || !$image;
+         }
+         else {
+            die Exception->new( 'msg' => "Unable to fork child to build image" );
+         }
+
+         flog("Reservation::launch: launching built image '$image'");
+         $self->data('image', $image);
+      }
+
+      my @cmd;
+      push(@cmd,
+         $CONFIG->{'docker'}{'bin'},
+         'create',
+         '--label', "owner.username=" . $self->owner('username'),
+         '--label', "owner.name=" . $self->owner('name'),
+
+         # TODO: Configure Profiles to support launch user.
+         # '--user=root',
+
+         ($self->cmdline())
+      );
+
+      my $cmd = join(' ', @cmd);
+      $cmd =~ s!\s+! !g;
+      
+      flog("Reservation::launch: RUNNING: $cmd");
 
       # Enable this to simulate slow launches.
       # sleep(30);

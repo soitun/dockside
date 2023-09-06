@@ -490,6 +490,7 @@ sub default_image {
    die "No default image found\n";
 }
 
+# TODO: Rename 'command' - there is no user overriding of command!
 sub default_command {
    my $self = shift;
 
@@ -504,10 +505,13 @@ sub default_command {
    return ();
 }
 
+# Return profile entrypoint: may be ARRAYREF or SCALAR.
+# TODO: Propose to fix to ARRAYREF OR ARRAY ONLY.
 sub entrypoint {
    my $self = shift;
 
-   return ref($self->{'entrypoint'}) eq 'ARRAY' ? join(' ', @{$self->{'entrypoint'}}) : $self->{'entrypoint'};
+   # return ref($self->{'entrypoint'}) eq 'ARRAY' ? join(' ', @{$self->{'entrypoint'}}) : $self->{'entrypoint'};
+   return $self->{'entrypoint'};
 }
 
 sub should_mount_ide {

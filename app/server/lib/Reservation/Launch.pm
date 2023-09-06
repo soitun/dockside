@@ -268,25 +268,40 @@ sub cmdline_init {
    return $self->profileObject->run_docker_init ? ('--init') : ();
 }
 
+# Concatenate any profile entrypoint array and data or profile command array.
+# Take everything except the 1st element for the command.
 sub cmdline_command {
    my $self = shift;
+   my $entrypoint = $self->profileObject->entrypoint;
    
    my @command;
+
+   if(ref($entrypoint) eq 'ARRAY' && scalar(@$entrypoint)) {
+      push(@command, @$entrypoint);
+
+      # Remove the first arg, which will be the entrypoint command
+      shift(@command);
+   }
    
    if(ref($self->data('command')) eq 'ARRAY') {
-      @command = @{$self->data('command')};
+      push(@command, @{$self->data('command')});
    }
    else {
-      @command = $self->profileObject->default_command();
+      push(@command, $self->profileObject->default_command());
    }
 
    return map { $self->_placeholders($_) } @command;
 }
 
+# Take the 1st element of any profile entrypoint array for the entrypoint.
 sub cmdline_entrypoint {
    my $self = shift;
+   my $entrypoint = $self->profileObject->entrypoint;
 
-   if(my $entrypoint = $self->profileObject->entrypoint) {
+   if(ref($entrypoint) eq 'ARRAY' && scalar(@$entrypoint)) {
+      return ('--entrypoint', $entrypoint->[0]);
+   }
+   else {
       return ('--entrypoint', $entrypoint);
    }
 
