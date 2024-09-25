@@ -131,6 +131,29 @@ _EOE_
     fi
 }
 
+# FIXME: Replace with call that runs this su'd to $IDE_USER
+# perhaps as one-off within launch-ide.sh
+
+create_git_repo() {
+   [ -n "$GIT_URL" ] || return
+
+   log "Creating git repo for '$GIT_URL' ..."
+   log "GIT_KEYS=$GIT_KEYS"
+
+   echo "$GIT_KEYS" | jq -re '.private' >/tmp/key
+   echo "$GIT_KEYS" | jq -re '.public' >/tmp/key.pub
+   chmod 400 /tmp/key /tmp/key.pub
+   chown $IDE_USER:root /tmp/key /tmp/key.pub
+   GIT_SSH_COMMAND="$IDE_PATH/bin/ssh -i /tmp/key -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+
+   local HOME=$(getent passwd $IDE_USER | cut -d':' -f6)
+   cd $HOME
+
+   log "- Running: $IDE_PATH/bin/git -c http.sslcainfo=$IDE_PATH/certs/ca-certificates.crt --exec-path=$IDE_PATH/bin clone $GIT_URL"
+
+   $IDE_PATH/bin/su $IDE_USER -c "env -i PATH=\"$_PATH\" HOME=\"$HOME\" USER=\"$IDE_USER\" GIT_SSH_COMMAND=\"$GIT_SSH_COMMAND\" $IDE_PATH/bin/git -c http.sslcainfo=$IDE_PATH/certs/ca-certificates.crt --exec-path=$IDE_PATH/bin clone $GIT_URL"
+}
+
 launch_sshd() {
    [ -x "$(which dropbear)" ] && [ -x "$(which dropbearkey)" ] && [ -x "$(which wstunnel)" ] || return
 
@@ -177,6 +200,10 @@ launch_ide() {
    create_git_config
    update_ssh_authorized_keys
    launch_sshd
+}
+
+launch_ide2() {
+   create_git_repo
    launch_theia
 }
 

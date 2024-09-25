@@ -19,7 +19,13 @@
          "runtimes": [ "*" ]
       },
       "ssh": {
-         "authorized_keys": []
+         "authorized_keys": [],
+         "keypairs": {
+            "github/newsnowlabs": {
+               "private": "-----BEGIN OPENSSH PRIVATE KEY-----\nb3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW\nQyNTUxOQAAACA057JCZL1v3S+56ukvm+smSl2Q1uAQlwJYx9Pi+BRXAAAAAKA9g8YfPYPG\nHwAAAAtzc2gtZWQyNTUxOQAAACA057JCZL1v3S+56ukvm+smSl2Q1uAQlwJYx9Pi+BRXAA\nAAAECJkjspgVqRZPCSSpGtSCKK9XS/my9rrUSie6xQ749+JjTnskJkvW/dL7nq6S+b6yZK\nXZDW4BCXAljH0+L4FFcAAAAAF3N0cnVhbkBzYnMtYWlyLTIwMjIubGFuAQIDBAUG\n-----END OPENSSH PRIVATE KEY-----",
+               "public": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDTnskJkvW/dL7nq6S+b6yZKXZDW4BCXAljH0+L4FFcA struan@sbs-air-2022.lan"
+            }
+         }
       }
    },
    // Example
