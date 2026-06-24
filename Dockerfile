@@ -475,6 +475,7 @@ LABEL maintainer="Struan Bartlett <struan.bartlett@NewsNow.co.uk>"
 ENV DEBIAN_FRONTEND=noninteractive
 
 ARG OPT_PATH
+ARG OPT_IMG_PATH=${OPT_PATH}.img
 ARG THEIA_PATH=$OPT_PATH/ide/theia
 ARG VSCODE_PATH=$OPT_PATH/ide/openvscode
 ARG DS_PATH=$OPT_PATH/system
@@ -486,9 +487,9 @@ ARG HOME=/home/dockside
 # BUNDLE INTEGRATION
 #
 COPY --from=base /tmp/dockside /tmp/dockside
-COPY --from=system $DS_PATH $DS_PATH/
-COPY --from=theia-ide-plugins $THEIA_PATH $THEIA_PATH/
-COPY --from=openvscode-ide $VSCODE_PATH $VSCODE_PATH/
+COPY --from=system $DS_PATH $OPT_IMG_PATH/system/
+COPY --from=theia-ide-plugins $THEIA_PATH $OPT_IMG_PATH/ide/theia/
+COPY --from=openvscode-ide $VSCODE_PATH $OPT_IMG_PATH/ide/openvscode/
 
 # ---------------------------------------------
 # COPY REMAINING GIT REPO CONTENTS TO THE IMAGE
@@ -508,13 +509,13 @@ RUN cp -a ~/$APP/build/development/dot-theia .vscode && \
 # Last things for root user
 USER root
 RUN . /tmp/dockside/bash-env && \
-    mkdir -p $OPT_PATH/bin $OPT_PATH/host && \
-    cp -a $HOME/$APP/app/scripts/container/launch.sh $OPT_PATH/bin/ && \
-    ln -sfr $OPT_PATH/bin/launch.sh $OPT_PATH/launch.sh && \
+    mkdir -p $OPT_IMG_PATH/bin $OPT_IMG_PATH/host $OPT_PATH && \
+    cp -a $HOME/$APP/app/scripts/container/launch.sh $OPT_IMG_PATH/bin/ && \
+    ln -sfr $OPT_IMG_PATH/bin/launch.sh $OPT_IMG_PATH/launch.sh && \
     ln -sf $HOME/$APP/app/scripts/entrypoint.sh /entrypoint.sh && \
     ln -sf $HOME/$APP/app/server/bin/password-wrapper /usr/local/bin/password && \
     ln -sf $HOME/$APP/app/server/bin/upgrade /usr/local/bin/upgrade && \
-    chown -R root:root $OPT_PATH/bin/ && \
+    chown -R root:root $OPT_IMG_PATH/bin/ && \
     # For backwards compatibility with legacy config.json /home/newsnow paths
     ln -sf $HOME /home/newsnow && \
     apt-get clean && rm -rf /var/cache/apt/* && rm -rf /var/lib/apt/lists/* && rm -rf /tmp/*
@@ -543,11 +544,10 @@ RUN apt-get update && \
 # COPY --from=vsix-plugins --chown=$USER:$USER /root/theia-plugins $HOME/theia-plugins/
 
 # -----------------------------------------------
-# Relocate /opt/dockside content to /opt/dockside.img so the entrypoint
-# can copy it into the named volume at /opt/dockside on container start.
-# This enables safe in-place upgrades: launch a new container against the
-# same named volume and  it will be brought up to date automatically.
-RUN mv $OPT_PATH $OPT_PATH.img && mkdir -p $OPT_PATH
+# Keep /opt/dockside as an empty volume mount point. Image-baked IDE,
+# system, and launcher content is assembled directly in /opt/dockside.img
+# so large bundle trees are not retained once at each path in separate
+# image layers.
 
 # -----------------------------------------------
 # Cause the creation of a volume at /opt/dockside
