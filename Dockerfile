@@ -15,7 +15,6 @@ FROM alpine:${SYSTEM_ALPINE_VERSION} AS base
 
 ARG OPT_PATH
 ARG TARGETPLATFORM
-ARG DOCKSIDE_VERSION
 
 # Create:
 # - a BASH_ENV script targeting the desired versions of IDE for the platform,
@@ -73,9 +72,6 @@ export THEIA_BUILD_EXTRA_PACKAGES="$THEIA_BUILD_EXTRA_PACKAGES"
 export OPENVSCODE_VERSION="$OPENVSCODE_VERSION"
 export OPENVSCODE_BINARY="$OPENVSCODE_BINARY"
 export OPENVSCODE_BUILD_DEBIAN_EXTRA_PACKAGES="$OPENVSCODE_BUILD_DEBIAN_EXTRA_PACKAGES"
-
-export DOCKSIDE_VERSION="$DOCKSIDE_VERSION"
-export DS_PATH=$OPT_PATH/system/$DOCKSIDE_VERSION
 
 echo "Running command with environment:" >&2
 echo "- TARGETPLATFORM=\$TARGETPLATFORM" >&2
@@ -276,7 +272,9 @@ _EOE_
 # Patch all binaries and dynamic libraries for full portability.
 FROM base AS system
 
+ARG OPT_PATH
 ARG DOCKSIDE_VERSION
+ENV DS_PATH=$OPT_PATH/system/$DOCKSIDE_VERSION
 
 # The BASH_ENV script will be executed prior to running all other RUN commands from here-on.
 ENV BASH_ENV=/tmp/dockside/bash-env
