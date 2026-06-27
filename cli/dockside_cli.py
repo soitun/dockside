@@ -1050,7 +1050,7 @@ def _make_router_url(router, container_name, parent_fqdn, data):
     protocol = 'https' if router.get('https') else 'http'
 
     if rtype == 'ide':
-        running_ide = data.get('runningIDE', '')
+        running_ide = data.get('runningIDE') or ''
         home_dir    = data.get('homeDir') or f'/home/{data.get("unixuser", "")}'
         path = (f'/?folder={home_dir}'
                 if running_ide.startswith('openvscode')
