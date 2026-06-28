@@ -1,5 +1,10 @@
 # Ignore files matching the following patterns within docker build
 **/*~
+**/.#*
+**/\#*\#
+**/*.orig
+**/*.bak
+**/*.tdy
 app/client/node_modules
 app/client/dist
 app/server/nginx/html/docs
